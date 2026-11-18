@@ -22,7 +22,7 @@ done
 curl -fsS "http://127.0.0.1:${PORT}/health" && echo
 
 echo "==> Writing nginx site ${SITE}"
-CF_IPS="$( { curl -fsS https://www.cloudflare.com/ips-v4; echo; curl -fsS https://www.cloudflare.com/ips-v6; } | grep -E '^[0-9a-f]' | sed 's/^/    set_real_ip_from /; s/$/;/')"
+CF_IPS="$( { curl -fsS https://www.cloudflare.com/ips-v4; echo; curl -fsS https://www.cloudflare.com/ips-v6; } | grep -E '^[0-9a-f:.]+/[0-9]+$' | sed 's/^/    set_real_ip_from /; s/$/;/')"
 if [ ! -f "$SITE" ] || ! grep -q "managed by Certbot" "$SITE"; then
   python3 - "$APP_DIR/deploy/nginx.conf" "$SITE" "$DOMAIN" "$PORT" "$CF_IPS" <<'PY'
 import sys
@@ -31,7 +31,8 @@ text = open(src).read().replace("__DOMAIN__", domain).replace("__PORT__", port).
 open(dst, "w").write(text)
 PY
   ln -sf "$SITE" "/etc/nginx/sites-enabled/${DOMAIN}"
-  nginx -t
+  # config galat ho to turant hata do taaki baaki sites ka nginx reload na toote
+  nginx -t || { rm -f "/etc/nginx/sites-enabled/${DOMAIN}" "$SITE"; echo "nginx config invalid, rolled back"; exit 1; }
   systemctl reload nginx
   echo "==> Requesting HTTPS certificate"
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect
