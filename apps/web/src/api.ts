@@ -105,25 +105,47 @@ export interface AnalysisResponse {
   };
 }
 
+export interface ProgressEvent {
+  stage: string;
+  percent: number | null;
+  message: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public code: string,
     message: string,
     public requestId?: string,
+    public details: Record<string, unknown> = {},
   ) {
     super(message);
   }
 }
 
-const TIMEOUT_MS = 120_000;
+const TIMEOUT_MS = 150_000;
 
-export async function analyze(url: string, signal: AbortSignal): Promise<AnalysisResponse> {
+function toApiError(body: any, status: number): ApiError {
+  const err = body?.error;
+  return new ApiError(
+    err?.code ?? `http_${status}`,
+    err?.message ?? (status === 429 ? "Too many requests. Please wait a moment and try again." : "Something went wrong. Please try again."),
+    err?.request_id,
+    err?.details ?? {},
+  );
+}
+
+// SSE stream padho: progress events aate rahenge, end me ek result ya error
+export async function analyzeStream(
+  url: string,
+  signal: AbortSignal,
+  onProgress: (event: ProgressEvent) => void,
+): Promise<AnalysisResponse> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch("/link-analysis", {
+    res = await fetch("/link-analysis/stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
       body: JSON.stringify({ url }),
       signal: AbortSignal.any([signal, timeout]),
     });
@@ -133,12 +155,40 @@ export async function analyze(url: string, signal: AbortSignal): Promise<Analysi
     throw new ApiError("network_error", "Could not reach the server. Check your internet connection.");
   }
 
-  const body = await res.json().catch(() => null);
-  if (res.ok && body?.success) return body as AnalysisResponse;
-  const err = body?.error;
-  throw new ApiError(
-    err?.code ?? `http_${res.status}`,
-    err?.message ?? "Something went wrong. Please try again.",
-    err?.request_id,
-  );
+  if (!res.ok || !res.body || !res.headers.get("content-type")?.includes("text/event-stream")) {
+    throw toApiError(await res.json().catch(() => null), res.status);
+  }
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let split: number;
+      while ((split = buffer.indexOf("\n\n")) !== -1) {
+        const block = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        let event = "message";
+        let data = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) event = line.slice(7);
+          else if (line.startsWith("data: ")) data += line.slice(6);
+        }
+        if (!data) continue;
+        const payload = JSON.parse(data);
+        if (event === "progress") onProgress(payload as ProgressEvent);
+        else if (event === "result") return payload as AnalysisResponse;
+        else if (event === "error") throw toApiError(payload, 500);
+      }
+    }
+  } catch (err) {
+    if (err instanceof ApiError || signal.aborted) throw err;
+    if (timeout.aborted) throw new ApiError("client_timeout", "The analysis took too long. Please try again.");
+    throw new ApiError("network_error", "The connection was interrupted. Please try again.");
+  } finally {
+    reader.releaseLock();
+  }
+  throw new ApiError("network_error", "The connection was interrupted. Please try again.");
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { analyze, ApiError, type AnalysisResponse } from "./api";
+import { analyzeStream, ApiError, type AnalysisResponse, type ProgressEvent } from "./api";
+import { AnalysisProgress } from "./progress";
 import { Audience, Competitors, RawJson, SearchQueries, SEO, Services } from "./sections";
 import { setTheme, type Theme } from "./theme";
 import { Icon, LogoMark, ResultsSkeleton } from "./ui";
@@ -22,7 +23,6 @@ const FEATURES = [
 ];
 
 const EXAMPLES = ["stripe.com", "notion.so", "zerodha.com", "canva.com"];
-const STEPS = ["Checking the link", "Reading the website", "Understanding the business", "Researching competitors & SEO", "Writing your report"];
 
 const TIPS: Record<string, string> = {
   invalid_url: "Type the address as it appears in your browser, e.g. example.com",
@@ -35,6 +35,7 @@ const TIPS: Record<string, string> = {
   rate_limited: "You've made many requests in a short time. Wait a minute and try again.",
   llm_unavailable: "The AI is busy. Waiting a minute usually fixes this.",
   llm_invalid_output: "This happens rarely. Trying again usually works.",
+  ai_quota_exhausted: "LinkLens is open source — clone it and add your own free Gemini key to keep analyzing right away.",
 };
 
 type TabId = (typeof TABS)[number]["id"];
@@ -46,7 +47,7 @@ function tabFromHash(): TabId {
 
 type State =
   | { kind: "idle" }
-  | { kind: "loading"; url: string }
+  | { kind: "loading"; url: string; events: ProgressEvent[] }
   | { kind: "error"; url: string; error: ApiError }
   | { kind: "done"; data: AnalysisResponse };
 
@@ -75,10 +76,12 @@ export default function App() {
     const ctrl = new AbortController();
     controller.current = ctrl;
     setUrl(value);
-    setState({ kind: "loading", url: value });
+    setState({ kind: "loading", url: value, events: [] });
     history.replaceState(null, "", `?url=${encodeURIComponent(value)}${location.hash}`);
     try {
-      const data = await analyze(value, ctrl.signal);
+      const data = await analyzeStream(value, ctrl.signal, (event) =>
+        setState((s) => (s.kind === "loading" && !ctrl.signal.aborted ? { ...s, events: [...s.events, event] } : s)),
+      );
       setState({ kind: "done", data });
     } catch (err) {
       if (ctrl.signal.aborted) return;
@@ -116,9 +119,21 @@ export default function App() {
         </a>
         <div className="topbar-actions">
           <a className="nav-link" href="/docs" target="_blank" rel="noopener">API</a>
-          <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-            <Icon name={theme === "dark" ? "sun" : "moon"} size={17} />
-          </button>
+          <div className="theme-switch" role="radiogroup" aria-label="Color theme">
+            {(["light", "dark"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={theme === t}
+                className={theme === t ? "active" : ""}
+                onClick={() => theme !== t && toggleTheme()}
+              >
+                <Icon name={t === "light" ? "sun" : "moon"} size={14} />
+                <span>{t === "light" ? "Light" : "Dark"}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
 
@@ -173,30 +188,17 @@ export default function App() {
             ))}
           </ul>
         )}
-        {loading && <Loading />}
+        {state.kind === "loading" && (
+          <div>
+            <AnalysisProgress key={state.url} events={state.events} url={state.url} />
+            <ResultsSkeleton />
+          </div>
+        )}
         {state.kind === "error" && <ErrorCard state={state} onRetry={() => run(state.url)} />}
         {state.kind === "done" && <Results data={state.data} tab={tab} setTab={setTab} />}
       </main>
 
       <footer className="footer">Insights are AI-generated from a website's public content. Verify before acting.</footer>
-    </div>
-  );
-}
-
-function Loading() {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 3500);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div aria-live="polite" aria-busy="true">
-      <div className="progress">
-        <span className="progress-label">{STEPS[step]}…</span>
-        <span className="progress-count">{step + 1} / {STEPS.length}</span>
-        <div className="progress-track"><div className="progress-bar" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div>
-      </div>
-      <ResultsSkeleton />
     </div>
   );
 }
@@ -210,7 +212,18 @@ function ErrorCard({ state, onRetry }: { state: Extract<State, { kind: "error" }
         <h3>{error.message}</h3>
         {TIPS[error.code] && <p className="muted">{TIPS[error.code]}</p>}
         <div className="row">
-          <button type="button" className="btn-dark" onClick={onRetry}>Try again</button>
+          {error.code === "ai_quota_exhausted" ? (
+            <>
+              <a className="btn-dark" href={String(error.details.self_host_guide ?? "https://github.com/kharetanishk/ai-link-analysis")} target="_blank" rel="noopener">
+                <Icon name="github" size={15} /> Run it yourself
+              </a>
+              <a className="btn-ghost" href={String(error.details.get_free_key ?? "https://aistudio.google.com/apikey")} target="_blank" rel="noopener noreferrer">
+                <Icon name="key" size={14} /> Get a free Gemini key
+              </a>
+            </>
+          ) : (
+            <button type="button" className="btn-dark" onClick={onRetry}>Try again</button>
+          )}
           {error.requestId && <span className="muted small">Ref {error.requestId.slice(0, 12)}</span>}
         </div>
       </div>
