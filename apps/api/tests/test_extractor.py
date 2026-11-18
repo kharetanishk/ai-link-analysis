@@ -41,11 +41,13 @@ def html(body, **kw):
 @respx.mock
 async def test_extracts_full_site(extractor):
     route = respx.route(host=PUBLIC_IP).mock(
-        side_effect=site({
-            ("acme.test", "/"): html(HOME_HTML),
-            ("acme.test", "/about"): html(ABOUT_HTML),
-            ("acme.test", "/services"): html(SERVICES_HTML),
-        })
+        side_effect=site(
+            {
+                ("acme.test", "/"): html(HOME_HTML),
+                ("acme.test", "/about"): html(ABOUT_HTML),
+                ("acme.test", "/services"): html(SERVICES_HTML),
+            }
+        )
     )
     result = await extractor.extract("https://acme.test/")
 
@@ -86,10 +88,12 @@ async def test_redirect_loop(extractor):
 @respx.mock
 async def test_follows_safe_redirect(extractor):
     respx.route(host=PUBLIC_IP).mock(
-        side_effect=site({
-            ("acme.test", "/"): httpx.Response(301, headers={"location": "https://www.acme.test/"}),
-            ("www.acme.test", "/"): html(HOME_HTML),
-        })
+        side_effect=site(
+            {
+                ("acme.test", "/"): httpx.Response(301, headers={"location": "https://www.acme.test/"}),
+                ("www.acme.test", "/"): html(HOME_HTML),
+            }
+        )
     )
     result = await extractor.extract("https://acme.test/")
     assert result.final_url == "https://www.acme.test/"
@@ -102,7 +106,10 @@ async def test_follows_safe_redirect(extractor):
         (httpx.Response(429), SiteBlockedError),
         (httpx.Response(404), SiteUnreachableError),
         (httpx.Response(500), SiteUnreachableError),
-        (httpx.Response(200, headers={"content-type": "application/pdf"}, content=b"%PDF-1.4"), UnsupportedContentError),
+        (
+            httpx.Response(200, headers={"content-type": "application/pdf"}, content=b"%PDF-1.4"),
+            UnsupportedContentError,
+        ),
         (html("   "), InsufficientContentError),
         (html("<html><body><p>Hi</p></body></html>"), InsufficientContentError),
     ],
@@ -131,8 +138,11 @@ async def test_body_size_is_capped(extractor):
 
 @respx.mock
 async def test_js_rendered_site_warns(extractor):
-    shell = ('<html><head><title>App</title><meta name="description" content="' + "A product platform. " * 10
-             + '"></head><body><div id="root"></div></body></html>')
+    shell = (
+        '<html><head><title>App</title><meta name="description" content="'
+        + "A product platform. " * 10
+        + '"></head><body><div id="root"></div></body></html>'
+    )
     respx.route(host=PUBLIC_IP).mock(return_value=html(shell))
     result = await extractor.extract("https://acme.test/")
     assert any("JavaScript" in w for w in result.warnings)

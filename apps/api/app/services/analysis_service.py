@@ -3,6 +3,7 @@ import time
 from datetime import UTC, datetime
 
 from app.config import Settings
+from app.errors import LLMConfigError
 from app.schemas import (
     Analysis,
     LinkAnalysisResponse,
@@ -42,6 +43,8 @@ class AnalysisService:
     async def analyze(self, raw_url: str) -> LinkAnalysisResponse:
         started = time.perf_counter()
         url = normalize_url(raw_url)
+        if not self.llm.configured:
+            raise LLMConfigError()
         result, cached = await self.cache.get_or_create(url, lambda: self._run(url))
         if cached:
             meta = result.meta.model_copy(

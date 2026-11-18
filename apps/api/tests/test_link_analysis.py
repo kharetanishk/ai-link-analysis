@@ -34,7 +34,11 @@ def test_link_analysis_success_and_cache(client):
     assert body["success"] is True
     assert body["website"] == "https://acme.test/"
     assert set(body["analysis"]) >= {
-        "competitor_analysis", "target_search_queries", "seo_improvements", "top_services", "target_audience",
+        "competitor_analysis",
+        "target_search_queries",
+        "seo_improvements",
+        "top_services",
+        "target_audience",
     }
     assert len(body["analysis"]["target_search_queries"]) == 5
     assert body["analysis"]["search_queries_note"]["search_volume"] == "not_provided"
@@ -97,9 +101,9 @@ def test_llm_not_configured(settings, fake_dns):
 def test_rate_limit(fake_dns):
     s = Settings(_env_file=None, static_dir="/nonexistent", rate_limit_requests=2)
     with TestClient(create_app(s)) as c:
-        codes = [c.post("/link-analysis", json={"url": "http://127.0.0.1"}).status_code for _ in range(3)]
-        last = c.post("/link-analysis", json={"url": "http://127.0.0.1"})
-    assert codes == [400, 400, 429]
+        codes = [c.post("/link-analysis", json={"url": "ftp://acme.test"}).status_code for _ in range(3)]
+        last = c.post("/link-analysis", json={"url": "ftp://acme.test"})
+    assert codes == [422, 422, 429]
     assert last.headers["retry-after"]
 
 
@@ -140,8 +144,11 @@ class FakeInteractions:
 
 
 def llm_with(results, **overrides):
-    service = LLMService(Settings(_env_file=None, gemini_api_key="test", gemini_model="primary",
-                                  gemini_fallback_model="backup", **overrides))
+    service = LLMService(
+        Settings(
+            _env_file=None, gemini_api_key="test", gemini_model="primary", gemini_fallback_model="backup", **overrides
+        )
+    )
     fake = FakeInteractions(results)
     service._client = SimpleNamespace(aio=SimpleNamespace(interactions=fake))
     return service, fake

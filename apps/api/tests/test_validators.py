@@ -21,16 +21,34 @@ def test_normalize_url(raw, expected):
 
 @pytest.mark.parametrize(
     "raw",
-    ["", "   ", "not a url", "ftp://example.com", "javascript:alert(1)", "https://user:pw@example.com",
-     "https://intranet", "https://" + "a" * 2050 + ".com", "http://[::1"],
+    [
+        "",
+        "   ",
+        "not a url",
+        "ftp://example.com",
+        "javascript:alert(1)",
+        "https://user:pw@example.com",
+        "https://intranet",
+        "https://" + "a" * 2050 + ".com",
+        "http://[::1",
+    ],
 )
 def test_normalize_rejects_invalid(raw):
     with pytest.raises(InvalidURLError):
         normalize_url(raw)
 
 
-@pytest.mark.parametrize("raw", ["localhost", "http://localhost:80", "https://db.internal", "https://printer.local",
-                                 "https://example.com:8080", "http://example.com:22"])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "localhost",
+        "http://localhost:80",
+        "https://db.internal",
+        "https://printer.local",
+        "https://example.com:8080",
+        "http://example.com:22",
+    ],
+)
 def test_normalize_blocks_internal_and_ports(raw):
     with pytest.raises(BlockedURLError):
         normalize_url(raw)

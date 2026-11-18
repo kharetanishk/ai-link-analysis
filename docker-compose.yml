@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    image: ai-link-analysis:latest
+    container_name: ai-link-analysis
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ENVIRONMENT: production
+    ports:
+      # sirf localhost par expose; public traffic nginx/HTTPS se aata hai
+      - "127.0.0.1:${HOST_PORT:-4000}:4000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
