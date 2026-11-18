@@ -1,3 +1,5 @@
+import asyncio
+import json
 import logging
 import time
 import uuid
@@ -7,10 +9,11 @@ import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import Settings, get_settings
-from app.errors import RateLimitedError, register_error_handlers
+from app.errors import AppError, RateLimitedError, error_body, register_error_handlers
 from app.schemas import ErrorResponse, LinkAnalysisRequest, LinkAnalysisResponse
 from app.services.analysis_service import AnalysisService
 from app.services.llm_service import LLMService
@@ -40,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 TTLCache(settings.cache_ttl_seconds, settings.cache_max_entries),
                 settings,
             )
+            app.state.tasks = set()
             app.state.limiter = RateLimiter(settings.rate_limit_requests, settings.rate_limit_window_seconds)
             if not llm.configured:
                 logging.getLogger("app").warning("GEMINI_API_KEY is not set; /link-analysis will return 503")
@@ -106,6 +110,57 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     async def link_analysis(body: LinkAnalysisRequest, request: Request) -> LinkAnalysisResponse:
         return await request.app.state.analysis.analyze(body.url)
+
+    @app.post(
+        "/link-analysis/stream",
+        tags=["Analysis"],
+        summary="Analyze a website with live progress (Server-Sent Events)",
+        description=(
+            "Same analysis as **POST /link-analysis**, streamed as `text/event-stream`. Emits `progress` events "
+            "(`stage`, `percent`, `message`), then exactly one `result` event (the full report) or `error` event "
+            "(the standard error envelope)."
+        ),
+        dependencies=[Depends(rate_limit)],
+        response_class=StreamingResponse,
+        responses={200: {"content": {"text/event-stream": {}}}},
+    )
+    async def link_analysis_stream(body: LinkAnalysisRequest, request: Request) -> StreamingResponse:
+        queue: asyncio.Queue[tuple[str, dict]] = asyncio.Queue()
+
+        def progress(stage: str, percent: int | None, message: str) -> None:
+            queue.put_nowait(("progress", {"stage": stage, "percent": percent, "message": message}))
+
+        async def run() -> None:
+            try:
+                result = await request.app.state.analysis.analyze(body.url, progress)
+                queue.put_nowait(("result", result.model_dump(mode="json")))
+            except AppError as exc:
+                queue.put_nowait(("error", error_body(exc.code, exc.message, request, exc.details)))
+            except Exception:
+                logging.getLogger("app.errors").exception("unhandled error in stream")
+                queue.put_nowait(("error", error_body(AppError.code, AppError.message, request)))
+
+        # client chala bhi jaye to analysis poora ho ke cache me jaye; task ka reference rakhna zaroori hai
+        task = asyncio.create_task(run())
+        request.app.state.tasks.add(task)
+        task.add_done_callback(request.app.state.tasks.discard)
+
+        async def events():
+            while True:
+                try:
+                    kind, data = await asyncio.wait_for(queue.get(), timeout=10)
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+                    continue
+                yield f"event: {kind}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+                if kind in ("result", "error"):
+                    return
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+        )
 
     @app.get("/health", tags=["System"], summary="Service health")
     async def health(request: Request) -> dict:

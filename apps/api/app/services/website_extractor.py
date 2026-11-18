@@ -18,6 +18,7 @@ from app.errors import (
     SiteUnreachableError,
     UnsupportedContentError,
 )
+from app.utils.progress import Progress, noop
 from app.utils.validators import SafeTarget, normalize_url, resolve_safe_target
 
 log = logging.getLogger("app.extractor")
@@ -94,8 +95,10 @@ class WebsiteExtractor:
         self.client = client
         self.settings = settings
 
-    async def extract(self, url: str) -> ExtractedSite:
+    async def extract(self, url: str, progress: Progress = noop) -> ExtractedSite:
+        progress("fetching", 8, f"Fetching {urlsplit(url).hostname}")
         page = await self.fetch(url)
+        progress("parsing", 16, "Parsing the homepage")
         soup = BeautifulSoup(page.html, "lxml", from_encoding=page.charset)
         site = ExtractedSite(requested_url=url, final_url=page.url)
         self._read_head(soup, site)
@@ -104,6 +107,8 @@ class WebsiteExtractor:
         self._read_body(soup, site)
 
         if self.settings.fetch_extra_pages and candidates:
+            names = ", ".join(_page_label(u) for u in candidates[: self.settings.fetch_extra_pages])
+            progress("reading", 22, f"Reading key pages: {names}")
             results = await asyncio.gather(
                 *(self._fetch_text(u) for u in candidates[: self.settings.fetch_extra_pages]),
                 return_exceptions=True,
@@ -117,6 +122,8 @@ class WebsiteExtractor:
         total = len(site.main_text) + sum(len(p.text) for p in site.pages) + len(site.meta_description)
         if total < MIN_TEXT_CHARS:
             raise InsufficientContentError()
+        words = sum(len(t.split()) for t in [site.main_text, *(p.text for p in site.pages)])
+        progress("extracted", 34, f"Read {len(site.pages_analyzed)} pages · {words:,} words of content")
         if len(site.main_text) < 400:
             site.warnings.append(
                 "The homepage has very little visible text (likely rendered by JavaScript); "
@@ -273,6 +280,10 @@ class WebsiteExtractor:
                     continue
                 scored[key] = max(scored.get(key, 0), score - parts.path.count("/"))
         return sorted(scored, key=scored.get, reverse=True)
+
+
+def _page_label(url: str) -> str:
+    return urlsplit(url).path.strip("/").split("/")[-1].replace("-", " ") or "home"
 
 
 def _strip_noise(soup: BeautifulSoup) -> None:

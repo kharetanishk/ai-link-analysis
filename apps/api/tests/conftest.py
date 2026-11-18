@@ -113,8 +113,11 @@ class FakeLLM:
         self.calls = 0
         self.last_prompt = ""
 
-    async def analyze(self, system_prompt: str, user_prompt: str) -> LLMResult:
+    async def analyze(self, system_prompt: str, user_prompt: str, progress=None) -> LLMResult:
         self.calls += 1
+        if progress:
+            progress("market_ready", 65, "Competitors & search queries ready")
+            progress("site_ready", 90, "SEO, services & audience ready")
         self.last_prompt = user_prompt
         return LLMResult(sample_analysis(), "fake-model", 42, TokenUsage(input=1000, output=500))
 

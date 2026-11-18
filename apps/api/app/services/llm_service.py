@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel, ValidationError
 
 from app.config import Settings
-from app.errors import AppError, LLMConfigError, LLMOutputError, LLMUnavailableError
+from app.errors import AIQuotaExhaustedError, AppError, LLMConfigError, LLMOutputError, LLMUnavailableError
 from app.schemas import LLMAnalysis, MarketAnalysis, SiteAnalysis, TokenUsage
+from app.utils.progress import Progress, noop
 
 log = logging.getLogger("app.llm")
 
@@ -16,6 +17,12 @@ PARTS: tuple[tuple[type[BaseModel], str], ...] = (
     (MarketAnalysis, "Return ONLY: brand, competitor_analysis and target_search_queries."),
     (SiteAnalysis, "Return ONLY: seo_improvements, top_services and target_audience."),
 )
+PART_DONE = {
+    MarketAnalysis: ("market_ready", "Competitors & search queries ready"),
+    SiteAnalysis: ("site_ready", "SEO, services & audience ready"),
+}
+QUOTA_STATUS = {402, 429}
+ERROR_PRIORITY = (LLMConfigError, AIQuotaExhaustedError, LLMOutputError)
 
 
 @dataclass
@@ -51,17 +58,24 @@ class LLMService:
     def configured(self) -> bool:
         return self._client is not None
 
-    async def analyze(self, system_prompt: str, user_prompt: str) -> LLMResult:
+    async def analyze(self, system_prompt: str, user_prompt: str, progress: Progress = noop) -> LLMResult:
         if not self._client:
             raise LLMConfigError()
+        done = 0
+
+        async def run(part: type[BaseModel], hint: str) -> _Part:
+            nonlocal done
+            result = await self._run_part(part, f"{user_prompt}\n\n{hint}", system_prompt, progress)
+            done += 1
+            progress(PART_DONE[part][0], 40 + 25 * done, PART_DONE[part][1])
+            return result
+
         async with self._semaphore:
-            results = await asyncio.gather(
-                *(self._run_part(part, f"{user_prompt}\n\n{hint}", system_prompt) for part, hint in PARTS),
-                return_exceptions=True,
-            )
+            results = await asyncio.gather(*(run(part, hint) for part, hint in PARTS), return_exceptions=True)
         errors = [r for r in results if isinstance(r, BaseException)]
         if errors:
-            raise next((e for e in errors if isinstance(e, LLMConfigError)), errors[0])
+            # sabse "actionable" error user ko dikhao
+            raise next((e for kind in ERROR_PRIORITY for e in errors if isinstance(e, kind)), errors[0])
 
         merged = {k: v for r in results for k, v in r.data}
         return LLMResult(
@@ -76,10 +90,14 @@ class LLMService:
             citations=[u for r in results for u in r.citations],
         )
 
-    async def _run_part(self, part: type[BaseModel], user_prompt: str, system_prompt: str) -> _Part:
+    async def _run_part(
+        self, part: type[BaseModel], user_prompt: str, system_prompt: str, progress: Progress = noop
+    ) -> _Part:
         models = list(dict.fromkeys([self.settings.gemini_model, self.settings.gemini_fallback_model]))
-        output_error = False
-        for model in models:
+        output_error = quota_hit = False
+        for index, model in enumerate(models):
+            if index:
+                progress("fallback", None, "Primary model is busy, switching to the backup model")
             # invalid JSON aaye to same model ek baar retry, API fail ho to seedha fallback model
             for attempt in (1, 2):
                 try:
@@ -99,7 +117,10 @@ class LLMService:
                         type(exc).__name__,
                         str(exc)[:300],
                     )
+                    quota_hit = quota_hit or _is_quota_error(exc)
                     break
+        if quota_hit:
+            raise AIQuotaExhaustedError()
         raise LLMOutputError() if output_error else LLMUnavailableError()
 
     async def _generate(self, model: str, part: type[BaseModel], system_prompt: str, user_prompt: str) -> _Part:
@@ -147,6 +168,11 @@ class LLMService:
         s = self.settings
         cost = usage.input * s.price_input_per_million + (usage.output + usage.thinking) * s.price_output_per_million
         return round(cost / 1_000_000, 6)
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    return status in QUOTA_STATUS or "RESOURCE_EXHAUSTED" in str(exc)
 
 
 def response_schema(model: type[BaseModel] = LLMAnalysis) -> dict:

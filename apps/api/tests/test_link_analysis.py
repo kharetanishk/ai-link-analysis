@@ -7,7 +7,7 @@ import respx
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.errors import LLMConfigError, LLMOutputError, LLMUnavailableError
+from app.errors import AIQuotaExhaustedError, LLMConfigError, LLMOutputError, LLMUnavailableError
 from app.main import create_app
 from app.services.competitor_service import refine_competitors
 from app.services.llm_service import LLMService, response_schema
@@ -116,7 +116,8 @@ def test_daily_capacity(client):
     assert client.post("/link-analysis", json={"url": "acme.test"}).status_code == 200
     assert client.post("/link-analysis", json={"url": "acme.test"}).status_code == 200
     blocked = client.post("/link-analysis", json={"url": "www.acme.test"})
-    assert blocked.status_code == 503 and blocked.json()["error"]["code"] == "llm_unavailable"
+    assert blocked.status_code == 503 and blocked.json()["error"]["code"] == "ai_quota_exhausted"
+    assert "self_host_guide" in blocked.json()["error"]["details"]
 
 
 def test_health_and_docs(client):
@@ -263,3 +264,49 @@ def test_cost_estimate():
     from app.schemas import TokenUsage
 
     assert service.estimate_cost(TokenUsage(input=1_000_000, output=100_000, thinking=100_000)) == 0.8
+
+
+async def test_llm_quota_exhausted_on_both_models():
+    quota = api_error("RateLimitError", 429)
+    service, _ = llm_with({"market": [quota, quota]})
+    with pytest.raises(AIQuotaExhaustedError):
+        await service.analyze("sys", "user")
+
+
+async def test_llm_reports_progress_and_fallback():
+    events = []
+    service, _ = llm_with({"site": [api_error("ServerError", 503)]})
+    await service.analyze("sys", "user", lambda stage, pct, msg: events.append((stage, pct)))
+    assert ("fallback", None) in events
+    ready = [e for e in events if e[0].endswith("_ready")]
+    assert sorted(stage for stage, _ in ready) == ["market_ready", "site_ready"] and [p for _, p in ready] == [65, 90]
+
+
+def parse_sse(text: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines() if not line.startswith(":"))
+        if "event" in lines:
+            events.append((lines["event"], json.loads(lines["data"])))
+    return events
+
+
+@respx.mock
+def test_stream_endpoint_reports_progress_then_result(client):
+    mock_site()
+    with client.stream("POST", "/link-analysis/stream", json={"url": "acme.test"}) as response:
+        assert response.headers["content-type"].startswith("text/event-stream")
+        events = parse_sse(response.read().decode())
+    stages = [d["stage"] for kind, d in events if kind == "progress"]
+    percents = [d["percent"] for kind, d in events if kind == "progress" and d["percent"] is not None]
+    assert stages[0] == "validating" and "extracted" in stages and stages[-1] == "done"
+    assert percents == sorted(percents) and percents[-1] == 100
+    kind, result = events[-1]
+    assert kind == "result" and result["success"] is True and len(result["analysis"]["target_search_queries"]) == 5
+
+
+def test_stream_endpoint_reports_errors(client):
+    with client.stream("POST", "/link-analysis/stream", json={"url": "http://127.0.0.1"}) as response:
+        events = parse_sse(response.read().decode())
+    kind, body = events[-1]
+    assert kind == "error" and body["success"] is False and body["error"]["code"] == "blocked_url"

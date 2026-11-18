@@ -79,13 +79,30 @@ class LLMOutputError(AppError):
     message = "The AI returned an incomplete analysis. Please retry."
 
 
+SELF_HOST_GUIDE = "https://github.com/kharetanishk/ai-link-analysis#3-run-it-yourself"
+
+
+class AIQuotaExhaustedError(AppError):
+    status_code = 503
+    code = "ai_quota_exhausted"
+    message = (
+        "The shared AI quota for this demo is used up for now. You can run LinkLens yourself in a few minutes "
+        "with your own free Gemini API key."
+    )
+
+    def __init__(self, message: str | None = None):
+        super().__init__(
+            message, details={"self_host_guide": SELF_HOST_GUIDE, "get_free_key": "https://aistudio.google.com/apikey"}
+        )
+
+
 class RateLimitedError(AppError):
     status_code = 429
     code = "rate_limited"
     message = "Too many requests. Please wait a moment and try again."
 
 
-def _body(code: str, message: str, request: Request, details: dict | None = None) -> dict:
+def error_body(code: str, message: str, request: Request, details: dict | None = None) -> dict:
     error = {"code": code, "message": message, "request_id": getattr(request.state, "request_id", None)}
     if details:
         error["details"] = details
@@ -97,13 +114,13 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _app_error(request: Request, exc: AppError):
         log.warning("%s: %s", exc.code, exc.message)
         headers = {"Retry-After": str(exc.details["retry_after"])} if "retry_after" in exc.details else None
-        return JSONResponse(_body(exc.code, exc.message, request, exc.details), exc.status_code, headers=headers)
+        return JSONResponse(error_body(exc.code, exc.message, request, exc.details), exc.status_code, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError):
         fields = [{"field": ".".join(str(p) for p in e["loc"][1:]), "issue": e["msg"]} for e in exc.errors()]
         return JSONResponse(
-            _body(
+            error_body(
                 "invalid_request",
                 'Request body must be JSON like {"url": "https://example.com"}.',
                 request,
@@ -114,9 +131,9 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException):
-        return JSONResponse(_body(f"http_{exc.status_code}", str(exc.detail), request), exc.status_code)
+        return JSONResponse(error_body(f"http_{exc.status_code}", str(exc.detail), request), exc.status_code)
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):
         log.exception("unhandled error")
-        return JSONResponse(_body(AppError.code, AppError.message, request), 500)
+        return JSONResponse(error_body(AppError.code, AppError.message, request), 500)
