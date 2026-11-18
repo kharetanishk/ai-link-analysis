@@ -12,6 +12,7 @@ Interactive documentation (try requests in the browser): **`/docs`** (Swagger UI
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/link-analysis` | Analyze a website and return the 5-section report |
+| `POST` | `/link-analysis/stream` | Same analysis with live progress (Server-Sent Events) |
 | `GET` | `/health` | Service status and active model |
 | `GET` | `/` | Web interface |
 
@@ -158,11 +159,57 @@ All errors use one envelope:
 | 502 | `llm_invalid_output` | AI output failed validation after retry and fallback | Retry |
 | 503 | `llm_unavailable` | AI provider busy or unavailable | Retry after ~1 min |
 | 503 | `llm_not_configured` | Server has no AI key configured | Server admin |
+| 503 | `ai_quota_exhausted` | Shared AI quota of this server is used up. `details.self_host_guide` and `details.get_free_key` give the next steps. | Run your own copy with a free key |
 | 500 | `internal_error` | Unexpected error (logged with `request_id`) | Report the `request_id` |
 
 ### Timing
 
 Typical response time is 13–30 seconds for a fresh analysis, and under 100 ms for a cached one. Set client timeouts to at least **120 seconds**.
+
+---
+
+## `POST /link-analysis/stream`
+
+The same request body and analysis as `POST /link-analysis`, returned as `text/event-stream` so clients can show real progress.
+
+| Event | `data` | When |
+|---|---|---|
+| `progress` | `{ "stage", "percent" (0–100 or null), "message" }` | Several times during the analysis |
+| `result` | The full success response (same as `POST /link-analysis`) | Once, at the end |
+| `error` | The standard error envelope | Once, instead of `result` |
+
+Stages, in order: `validating` (3) → `fetching` (8) → `parsing` (16) → `reading` (22) → `extracted` (34) → `analyzing` (40) → `market_ready` / `site_ready` (65, 90, in completion order) → `refining` (93) → `done` (100). A `fallback` stage with `percent: null` appears if the backup model takes over. A `: keep-alive` comment is sent every 10 seconds of silence.
+
+Request-validation errors (malformed body) and rate limiting are still returned as normal JSON responses (`422` / `429`), so check the `Content-Type` before reading the stream.
+
+```bash
+curl -N -X POST https://link-analysis.lunarnodes.co.in/link-analysis/stream \
+  -H "Content-Type: application/json" -d '{"url": "hubspot.com"}'
+```
+
+Minimal JavaScript reader:
+
+```js
+const res = await fetch("/link-analysis/stream", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ url: "hubspot.com" }),
+});
+const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = "";
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += value;
+  let i;
+  while ((i = buffer.indexOf("\n\n")) !== -1) {
+    const block = buffer.slice(0, i); buffer = buffer.slice(i + 2);
+    const event = block.match(/^event: (.*)$/m)?.[1];
+    const data = block.match(/^data: (.*)$/m)?.[1];
+    if (event && data) console.log(event, JSON.parse(data));
+  }
+}
+```
 
 ---
 

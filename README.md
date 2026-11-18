@@ -11,6 +11,7 @@
 |---|---|
 | **Live app** | https://link-analysis.lunarnodes.co.in |
 | **API endpoint** | `POST https://link-analysis.lunarnodes.co.in/link-analysis` |
+| **Streaming endpoint** (live progress) | `POST https://link-analysis.lunarnodes.co.in/link-analysis/stream` |
 | **Interactive API docs** | https://link-analysis.lunarnodes.co.in/docs |
 | **Health check** | https://link-analysis.lunarnodes.co.in/health |
 
@@ -64,7 +65,7 @@ The analysis follows the assignment's integrity rules:
 
 1. Open **https://link-analysis.lunarnodes.co.in**
 2. Type or paste a website, for example `stripe.com` (the `https://` part is optional).
-3. Press **Analyze** and wait about 15–30 seconds.
+3. Press **Analyze**. A live progress card shows the real percentage and what is happening right now (fetching pages, researching competitors, refining…). It usually finishes in 15–30 seconds.
 4. Switch between the tabs: **Competitors · Search queries · SEO · Top services · Audience · JSON**.
 5. Use **Copy** on any recommended title or description, or **Download** the full JSON.
 
@@ -79,7 +80,9 @@ A step-by-step guide with pictures is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.
 
 ## 3. Run it yourself
 
-You need a free **Gemini API key** from https://aistudio.google.com/apikey.
+LinkLens is open source. If the public demo's shared AI quota is used up (you'll see a clear *"shared AI quota is used up"* message), you can run your own copy in a few minutes.
+
+You need a free **Gemini API key** from https://aistudio.google.com/apikey. It takes a Google account and about a minute, and no card is required for the free tier.
 
 ### Option A: Docker (recommended, one command)
 
@@ -205,6 +208,29 @@ Every error has the same shape, so clients only need one parser:
 | 429 | `rate_limited` | Too many requests (`Retry-After` header included) |
 | 502 | `llm_invalid_output` | AI returned malformed output, even after retry and fallback |
 | 503 | `llm_unavailable` / `llm_not_configured` | AI provider down or busy, or no API key on the server |
+| 503 | `ai_quota_exhausted` | The demo's shared AI quota is used up. `details.self_host_guide` links to [Run it yourself](#3-run-it-yourself) with your own free key. |
+
+### Live progress (Server-Sent Events)
+
+`POST /link-analysis/stream` takes the same body and streams `progress` events (`stage`, `percent`, `message`), then one `result` (the full report) or `error` event. The web UI uses this to show real progress instead of a blank wait.
+
+```bash
+curl -N -X POST https://link-analysis.lunarnodes.co.in/link-analysis/stream \
+  -H "Content-Type: application/json" -d '{"url": "bluetokaicoffee.com"}'
+```
+
+```text
+event: progress
+data: {"stage":"fetching","percent":8,"message":"Fetching bluetokaicoffee.com"}
+...
+event: progress
+data: {"stage":"extracted","percent":34,"message":"Read 4 pages · 1,861 words of content"}
+event: progress
+data: {"stage":"market_ready","percent":65,"message":"Competitors & search queries ready"}
+...
+event: result
+data: {"success":true, ...full report...}
+```
 
 Full field-by-field reference: **[docs/API.md](docs/API.md)**.
 
@@ -342,7 +368,7 @@ ai-link-analysis/                 monorepo
 │   │   │       ├── validators.py  URL normalization + SSRF protection
 │   │   │       └── cache.py       TTL cache, request coalescing, rate limiter
 │   │   ├── scripts/benchmark.py  reproducible LLM benchmark
-│   │   └── tests/                pytest suite (75 tests)
+│   │   └── tests/                pytest suite (80 tests)
 │   └── web/                      React + Vite + TypeScript UI (self-hosted fonts, no UI framework)
 ├── deploy/                       nginx template + one-command server deploy
 ├── docs/                         guides, research, screenshots, sample responses
@@ -360,7 +386,7 @@ ai-link-analysis/                 monorepo
 make test
 ```
 
-- **75 automated tests**. No network or API key is needed: a fake website and a fake LLM are used.
+- **80 automated tests**. No network or API key is needed: a fake website and a fake LLM are used.
   - **SSRF:** loopback, private ranges, metadata IP, IPv6, IPv4-mapped, CGNAT, mixed DNS answers, redirect to an internal host, redirect loops, odd ports, credentials in the URL.
   - **Extraction:** metadata, JSON-LD, dedupe, sub-page discovery, size cap, timeouts, status-code mapping, JS-rendered sites.
   - **LLM:** parallel parts, invalid-JSON retry, fallback on 429/5xx, no retry on auth errors, schema consistency (the regression test for a real bug found in production).

@@ -38,7 +38,13 @@ Not sure what to try? Click one of the examples under the box (**stripe.com**, *
 
 ### 3. Press Analyze
 
-While the report is being prepared you'll see a progress line ("Reading the website…", "Researching competitors & SEO…") and grey placeholder blocks in the shape of the final report.
+While the report is being prepared you'll see a live progress card:
+
+- a **percentage** that moves as real work completes,
+- **what is happening right now** (for example "Fetching hubspot.com", "Reading key pages: about, pricing", "Cross-referencing competitors…"),
+- a **checklist** of the four big steps, ticked off as each finishes,
+
+with grey placeholder blocks in the shape of the final report underneath.
 
 ![Loading](screenshots/00-loading.png)
 
@@ -75,9 +81,9 @@ Below that are six tabs. Click any tab, or use the ← → arrow keys.
 - **Share**: the address bar link opens the same report. Adding `#seo`, `#services` and so on opens a specific tab. Example: `https://link-analysis.lunarnodes.co.in/?url=stripe.com#seo`
 - **Save**: go to the **JSON** tab and click **Download**.
 
-### 6. Dark mode
+### 6. Light and dark mode
 
-Click the moon or sun button in the top-right corner. Your choice is remembered.
+Use the **Light / Dark** switch in the top-right corner. Your choice is remembered.
 
 ---
 
@@ -110,6 +116,7 @@ LinkLens explains every problem in plain words, with a tip and a **Try again** b
 | "The page has too little readable text" | Try a more specific page, such as `/about` or `/services`. |
 | "Too many requests" | Wait one minute and try again. |
 | "The AI service is busy" | Wait a minute and try again. |
+| "The shared AI quota for this demo is used up" | The free demo has reached its AI limit for now. Click **Run it yourself** for the 3-step setup, and **Get a free Gemini key** to create your own key. |
 
 ---
 
