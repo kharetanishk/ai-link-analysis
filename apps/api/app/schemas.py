@@ -27,19 +27,19 @@ class Competitor(BaseModel):
     website: str | None = Field(default=None, description="Homepage URL if confidently known, else null")
     main_service: str
     target_market: str
-    strengths: list[str]
-    weaknesses: list[str] = Field(description="Gaps or weaknesses relative to the analyzed brand")
+    strengths: list[str] = Field(max_length=3)
+    weaknesses: list[str] = Field(max_length=3, description="Gaps or weaknesses relative to the analyzed brand")
 
 
 class CompetitorAnalysis(BaseModel):
     brand_overview: str
     business_category: str
-    products_and_services: list[str]
+    products_and_services: list[str] = Field(max_length=8)
     your_target_market: str
     your_key_strength: str
     competitors: list[Competitor] = Field(max_length=5)
-    strengths: list[str] = Field(description="The analyzed brand's competitive advantages")
-    opportunities: list[str] = Field(description="Ways to improve market positioning")
+    strengths: list[str] = Field(max_length=5, description="The analyzed brand's competitive advantages")
+    opportunities: list[str] = Field(max_length=5, description="Ways to improve market positioning")
 
 
 class SearchQuery(BaseModel):
@@ -58,13 +58,13 @@ class SupportingContent(BaseModel):
 
 class SEOImprovements(BaseModel):
     primary_keyword: str
-    secondary_keywords: list[str]
-    long_tail_keywords: list[str]
-    business_keywords: list[str]
+    secondary_keywords: list[str] = Field(max_length=8)
+    long_tail_keywords: list[str] = Field(max_length=6)
+    business_keywords: list[str] = Field(max_length=8)
     recommended_title: str = Field(description="50-60 characters, primary keyword near the start")
     title_structure: str = Field(description="Pattern used, e.g. 'Primary Keyword | Benefit | Brand'")
     meta_description: str = Field(description="140-160 characters, human-friendly, includes primary keyword")
-    supporting_content: list[SupportingContent]
+    supporting_content: list[SupportingContent] = Field(max_length=6)
 
 
 class Service(BaseModel):
@@ -85,16 +85,28 @@ class AudienceSegment(BaseModel):
 
 
 class TargetAudience(BaseModel):
-    primary_audience: list[str]
-    secondary_audience: list[str]
-    industries: list[str]
-    business_types: list[str]
-    customer_profiles: list[str]
+    primary_audience: list[str] = Field(max_length=5)
+    secondary_audience: list[str] = Field(max_length=5)
+    industries: list[str] = Field(max_length=5)
+    business_types: list[str] = Field(max_length=5)
+    customer_profiles: list[str] = Field(max_length=5)
     geographic_focus: str | None = Field(description="Location focus if evident from the site, else null")
-    customer_needs: list[str]
-    challenges: list[str]
-    interests: list[str]
+    customer_needs: list[str] = Field(max_length=5)
+    challenges: list[str] = Field(max_length=5)
+    interests: list[str] = Field(max_length=5)
     recommended_segments: list[AudienceSegment] = Field(max_length=6)
+
+
+class MarketAnalysis(BaseModel):
+    brand: Brand
+    competitor_analysis: CompetitorAnalysis
+    target_search_queries: list[SearchQuery] = Field(min_length=5, max_length=5)
+
+
+class SiteAnalysis(BaseModel):
+    seo_improvements: SEOImprovements
+    top_services: list[Service] = Field(min_length=1, max_length=5)
+    target_audience: TargetAudience
 
 
 class LLMAnalysis(BaseModel):

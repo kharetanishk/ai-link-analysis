@@ -125,22 +125,53 @@ def test_refine_competitors_grounded_sources():
     assert warnings == []
 
 
-def test_schema_is_flat():
-    assert "$ref" not in json.dumps(response_schema())
-    assert "$defs" not in response_schema()
+def test_schema_is_flat_and_consistent():
+    schema = response_schema()
+    assert "$ref" not in json.dumps(schema) and "$defs" not in schema
+
+    def check(node):
+        if isinstance(node, dict):
+            if node.get("type") == "object":
+                assert set(node.get("required", [])) <= set(node["properties"]), node.get("required")
+                assert "title" not in node
+            for value in node.values():
+                check(value)
+        elif isinstance(node, list):
+            for value in node:
+                check(value)
+
+    check(schema)
+    assert (
+        "title" in schema["properties"]["seo_improvements"]["properties"]["supporting_content"]["items"]["properties"]
+    )
+
+
+MARKET_KEYS = ("brand", "competitor_analysis", "target_search_queries")
+
+
+def part_payload(body) -> dict:
+    full = sample_analysis().model_dump()
+    keys = body["response_format"]["schema"]["properties"]
+    return {k: full[k] for k in keys}
 
 
 class FakeInteractions:
+    """results: per-part queues {"market": [...], "site": [...]}; empty queue = valid payload."""
+
     def __init__(self, results):
-        self.results = list(results)
-        self.models = []
+        self.results = {k: list(v) for k, v in results.items()}
+        self.calls = []
 
     async def create(self, **body):
-        self.models.append(body["model"])
-        result = self.results.pop(0)
-        if isinstance(result, Exception):
-            raise result
-        return result
+        part = "market" if "brand" in body["response_format"]["schema"]["properties"] else "site"
+        self.calls.append((body["model"], part))
+        queue = self.results.get(part, [])
+        outcome = queue.pop(0) if queue else "ok"
+        if isinstance(outcome, Exception):
+            raise outcome
+        if outcome == "ok":
+            return interaction(part_payload(body))
+        return interaction(outcome)
 
 
 def llm_with(results, **overrides):
@@ -154,56 +185,65 @@ def llm_with(results, **overrides):
     return service, fake
 
 
-async def test_llm_retries_invalid_json_then_succeeds():
-    good = interaction(sample_analysis().model_dump())
-    service, fake = llm_with([interaction("{broken"), good])
+def api_error(name, status):
+    return type(name, (Exception,), {"status_code": status})(name)
+
+
+async def test_llm_runs_two_parts_in_parallel_and_merges():
+    service, fake = llm_with({})
     result = await service.analyze("sys", "user")
-    assert fake.models == ["primary", "primary"]
-    assert result.usage.input == 1200 and result.usage.thinking == 100
+    assert sorted(p for _, p in fake.calls) == ["market", "site"]
+    assert result.data.brand.name == "Acme Web Studio" and len(result.data.target_search_queries) == 5
+    assert result.usage.input == 2400 and result.usage.thinking == 200
+
+
+async def test_llm_retries_invalid_json_then_succeeds():
+    service, fake = llm_with({"market": ["{broken"]})
+    result = await service.analyze("sys", "user")
+    assert fake.calls.count(("primary", "market")) == 2 and ("backup", "market") not in fake.calls
+    assert result.model == "primary"
 
 
 async def test_llm_falls_back_on_api_error():
-    error = type("RateLimitError", (Exception,), {"status_code": 429})("quota")
-    service, fake = llm_with([error, interaction(sample_analysis().model_dump())])
+    service, fake = llm_with({"market": [api_error("RateLimitError", 429)], "site": [api_error("RateLimitError", 429)]})
     result = await service.analyze("sys", "user")
-    assert fake.models == ["primary", "backup"] and result.model == "backup"
+    assert sorted(fake.calls) == [("backup", "market"), ("backup", "site"), ("primary", "market"), ("primary", "site")]
+    assert result.model == "backup"
 
 
 async def test_llm_all_fail():
-    error = type("ServerError", (Exception,), {"status_code": 500})("down")
-    service, _ = llm_with([error, error])
+    service, _ = llm_with({"market": [api_error("ServerError", 500)] * 2})
     with pytest.raises(LLMUnavailableError):
         await service.analyze("sys", "user")
 
 
 async def test_llm_bad_output_everywhere():
-    service, fake = llm_with([interaction('{"x":1}')] * 4)
+    service, fake = llm_with({"site": ['{"x":1}'] * 4})
     with pytest.raises(LLMOutputError):
         await service.analyze("sys", "user")
-    assert len(fake.models) == 4
+    assert [c for c in fake.calls if c[1] == "site"] == [("primary", "site")] * 2 + [("backup", "site")] * 2
 
 
 async def test_llm_auth_error_is_not_retried():
-    error = type("AuthenticationError", (Exception,), {"status_code": 401})("bad key")
-    service, fake = llm_with([error])
+    service, fake = llm_with({"market": [api_error("AuthenticationError", 401)]})
     with pytest.raises(LLMConfigError):
         await service.analyze("sys", "user")
-    assert fake.models == ["primary"]
+    assert ("backup", "market") not in fake.calls
 
 
-async def test_llm_sends_grounding_tool_when_enabled():
-    service, _ = llm_with([], enable_search_grounding=True)
-    captured = {}
+async def test_llm_grounding_only_on_market_part():
+    service, _ = llm_with({}, enable_search_grounding=True)
+    captured = []
 
     async def create(**body):
-        captured.update(body)
-        return interaction(sample_analysis().model_dump())
+        captured.append(body)
+        return interaction(part_payload(body))
 
     service._client.aio.interactions.create = create
     await service.analyze("sys", "user")
-    assert captured["tools"] == [{"type": "google_search"}]
-    assert captured["response_format"]["mime_type"] == "application/json"
-    assert captured["store"] is False
+    tools = {("brand" in b["response_format"]["schema"]["properties"]): b.get("tools") for b in captured}
+    assert tools == {True: [{"type": "google_search"}], False: None}
+    assert all(b["store"] is False and b["response_format"]["mime_type"] == "application/json" for b in captured)
 
 
 def test_cost_estimate():

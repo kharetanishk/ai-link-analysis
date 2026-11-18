@@ -16,18 +16,18 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.5-flash-lite"
-    gemini_fallback_model: str = "gemini-3.1-flash-lite"
+    gemini_model: str = "gemini-3.1-flash-lite"
+    gemini_fallback_model: str = "gemini-3.5-flash-lite"
     gemini_thinking_level: str = "low"
     gemini_max_output_tokens: int = 8192
-    llm_timeout_seconds: float = 60.0
+    llm_timeout_seconds: float = 40.0
     llm_max_concurrency: int = 4
     # Google Search grounding se competitors real web data par based hote hain
     enable_search_grounding: bool = False
 
     # USD per 1M tokens, cost estimate ke liye (pricing badle to .env me update karo)
-    price_input_per_million: float = 0.30
-    price_output_per_million: float = 2.50
+    price_input_per_million: float = 0.25
+    price_output_per_million: float = 1.50
 
     fetch_timeout_seconds: float = 12.0
     fetch_max_bytes: int = 2_000_000
