@@ -11,3 +11,5 @@ dist/
 apps/api/static/
 .DS_Store
 *.log
+.cloudflare/
+.wrangler/
