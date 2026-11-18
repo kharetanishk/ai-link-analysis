@@ -1,27 +1,39 @@
 import { useState, type ReactNode } from "react";
 
+// thin-stroke icons (24px grid), ek hi visual weight poore UI me
 const paths: Record<string, string> = {
-  search: "M11 4a7 7 0 1 0 4.4 12.4l4.1 4.1 1.4-1.4-4.1-4.1A7 7 0 0 0 11 4Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z",
-  copy: "M8 3h10a2 2 0 0 1 2 2v12h-2V5H8V3Zm-3 4h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Zm0 2v10h10V9H5Z",
-  check: "M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6L20.1 8.4 18.7 7z",
-  download: "M11 4h2v8.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3V4ZM5 18h14v2H5v-2Z",
-  external: "M14 4h6v6h-2V7.4l-7.3 7.3-1.4-1.4L16.6 6H14V4ZM5 6h6v2H6v10h10v-5h2v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z",
-  swords: "M4 4h5l9 9 1.5-1.5 1.4 1.4-2.1 2.1 2.2 2.2-2.8 2.8-2.2-2.2-2.1 2.1-1.4-1.4L14 17l-9-9V4Zm2 2v1.2l8.5 8.5 1.2-1.2L7.2 6H6Z",
-  query: "M4 5h16v2H4V5Zm0 6h10v2H4v-2Zm0 6h7v2H4v-2Zm13.5-4a3.5 3.5 0 0 1 2.9 5.4l1.8 1.8-1.4 1.4-1.8-1.8A3.5 3.5 0 1 1 17.5 13Zm0 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z",
-  chart: "M4 19h16v2H4v-2Zm1-8h3v6H5v-6Zm5-4h3v10h-3V7Zm5 3h3v7h-3v-7Z",
-  briefcase: "M9 4h6a2 2 0 0 1 2 2v1h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V6a2 2 0 0 1 2-2Zm0 3h6V6H9v1ZM5 9v9h14V9H5Z",
-  users: "M9 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm7.5 1a3 3 0 1 1 0 6 3 3 0 0 1 0-6ZM2 19c0-3 3.1-5 7-5s7 2 7 5v1h-2v-1c0-1.6-2.1-3-5-3s-5 1.4-5 3v1H2v-1Zm15.5-3.9c2.6.3 4.5 1.8 4.5 3.9v1h-2v-1c0-.9-.9-1.6-2.5-1.9v-2Z",
-  code: "m8.6 7.4-4.6 4.6 4.6 4.6L7.2 18l-6-6 6-6 1.4 1.4Zm6.8 0L16.8 6l6 6-6 6-1.4-1.4 4.6-4.6-4.6-4.6Z",
-  alert: "M12 3 2 21h20L12 3Zm0 4.5 6.6 11.5H5.4L12 7.5ZM11 11h2v4h-2v-4Zm0 5h2v2h-2v-2Z",
-  sun: "M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM11 1h2v3h-2V1Zm0 19h2v3h-2v-3ZM3.5 4.9l1.4-1.4 2.1 2.1-1.4 1.4-2.1-2.1Zm13 13 1.4-1.4 2.1 2.1-1.4 1.4-2.1-2.1ZM1 11h3v2H1v-2Zm19 0h3v2h-3v-2ZM4.9 20.5l-1.4-1.4 2.1-2.1 1.4 1.4-2.1 2.1Zm13-13-1.4-1.4 2.1-2.1 1.4 1.4-2.1 2.1Z",
-  moon: "M12.3 2a8 8 0 0 0 9.7 9.7A10 10 0 1 1 12.3 2Zm-2.6 2.6a8 8 0 1 0 9.7 9.7 10 10 0 0 1-9.7-9.7Z",
-  sparkle: "M12 2l2.1 6.4L20.5 10l-6.4 2.1L12 18.5l-2.1-6.4L3.5 10l6.4-1.6L12 2Zm7 13 1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3Z",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4-4",
+  copy: "M9 9h10v10H9zM5 15V5h10",
+  check: "m5 12 5 5L20 7",
+  download: "M12 4v11m0 0-4-4m4 4 4-4M5 20h14",
+  external: "M14 5h5v5m0-5-8 8M10 5H5v14h14v-5",
+  swords: "M4 20 20 4M14 4h6v6M10 20H4v-6",
+  query: "M4 6h16M4 12h9M4 18h6m10 1-2.5-2.5M15.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+  chart: "M4 20h16M7 16v-5m5 5V7m5 9v-8",
+  briefcase: "M4 8h16v11H4zM9 8V5h6v3M4 13h16",
+  users: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-6 9c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14.8c1.8.6 3 2.4 3 5.2",
+  code: "m8 7-5 5 5 5m8-10 5 5-5 5",
+  alert: "M12 4 2.5 20h19L12 4Zm0 6v4m0 3v.01",
+  sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-14v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
+  moon: "M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z",
 };
 
-export function Icon({ name, size = 18 }: { name: keyof typeof paths | string; size?: number }) {
+export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={paths[name]} />
+    </svg>
+  );
+}
+
+export function LogoMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden="true" className="logo-mark">
+      <circle cx="14" cy="14" r="10" strokeWidth={2.4} />
+      <path d="m21.5 21.5 6.5 6.5" strokeWidth={2.8} />
+      <path d="m12.6 11.4 1.6-1.6a2.4 2.4 0 0 1 3.4 3.4L16 14.8M15.4 16.6l-1.6 1.6a2.4 2.4 0 0 1-3.4-3.4l1.6-1.6M12.5 15.5l3-3" strokeWidth={1.9} />
     </svg>
   );
 }
@@ -31,9 +43,7 @@ export function Chips({ items, tone }: { items: string[]; tone?: "accent" | "mut
   return (
     <div className="chips">
       {items.map((item) => (
-        <span key={item} className={`chip ${tone ?? ""}`}>
-          {item}
-        </span>
+        <span key={item} className={`chip ${tone ?? ""}`}>{item}</span>
       ))}
     </div>
   );
@@ -43,9 +53,7 @@ export function List({ items }: { items: string[] }) {
   if (!items?.length) return <p className="muted">Nothing identified.</p>;
   return (
     <ul className="list">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
+      {items.map((item) => <li key={item}>{item}</li>)}
     </ul>
   );
 }
@@ -62,7 +70,7 @@ export function Card({ title, subtitle, children, actions }: {
         <header className="card-head">
           <div>
             {title && <h3>{title}</h3>}
-            {subtitle && <p className="muted small">{subtitle}</p>}
+            {subtitle && <p className="card-sub">{subtitle}</p>}
           </div>
           {actions}
         </header>
@@ -94,7 +102,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
   };
   return (
     <button type="button" className="btn-ghost" onClick={copy} aria-live="polite">
-      <Icon name={copied ? "check" : "copy"} size={16} />
+      <Icon name={copied ? "check" : "copy"} size={14} />
       {copied ? "Copied" : label}
     </button>
   );
@@ -109,22 +117,66 @@ export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
     <div className="table-wrap">
       <table>
         <thead>
-          <tr>
-            {head.map((h) => (
-              <th key={h} scope="col">{h}</th>
-            ))}
-          </tr>
+          <tr>{head.map((h) => <th key={h} scope="col">{h}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j} data-label={head[j]}>{cell}</td>
-              ))}
+              {row.map((cell, j) => <td key={j} data-label={head[j]}>{cell}</td>)}
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export function Skeleton({ w = "100%", h = 12, r = 6, className = "" }: { w?: string | number; h?: number; r?: number; className?: string }) {
+  return <span className={`skeleton ${className}`} style={{ width: w, height: h, borderRadius: r }} />;
+}
+
+function SkeletonCard({ lines = 3, table = false }: { lines?: number; table?: boolean }) {
+  return (
+    <div className="card">
+      <Skeleton w="32%" h={16} />
+      <div className="sk-gap" />
+      {table
+        ? [0, 1, 2, 3].map((i) => (
+            <div key={i} className="sk-row">
+              <Skeleton w="18%" /><Skeleton w="22%" /><Skeleton w="26%" /><Skeleton w="20%" />
+            </div>
+          ))
+        : Array.from({ length: lines }, (_, i) => <Skeleton key={i} w={`${92 - i * 14}%`} className="sk-line" />)}
+    </div>
+  );
+}
+
+export function ResultsSkeleton() {
+  return (
+    <div className="results skeleton-results" aria-hidden="true">
+      <section className="brand">
+        <Skeleton w={64} h={64} r={16} />
+        <div className="brand-body">
+          <Skeleton w={140} h={10} />
+          <Skeleton w={220} h={34} r={8} className="sk-line" />
+          <Skeleton w="90%" className="sk-line" />
+          <Skeleton w="70%" className="sk-line" />
+        </div>
+        <div className="stats">
+          {[0, 1, 2].map((i) => <Skeleton key={i} w={84} h={52} r={12} />)}
+        </div>
+      </section>
+      <div className="tabs">
+        {[90, 110, 50, 70, 80, 50].map((w, i) => <Skeleton key={i} w={w} h={14} className="sk-tab" />)}
+      </div>
+      <div className="stack">
+        <SkeletonCard lines={4} />
+        <SkeletonCard table />
+        <div className="grid-2">
+          <SkeletonCard lines={3} />
+          <SkeletonCard lines={3} />
+        </div>
+      </div>
     </div>
   );
 }

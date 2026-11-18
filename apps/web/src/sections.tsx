@@ -14,8 +14,9 @@ export function Competitors({ data }: Props) {
           <Field label="Business category">{c.business_category}</Field>
           <Field label="Target market">{c.your_target_market}</Field>
           <Field label="Key strength">{c.your_key_strength}</Field>
-          <Field label="Products & services"><Chips items={c.products_and_services} /></Field>
         </div>
+        <div className="sk-gap" />
+        <Field label="Products & services"><Chips items={c.products_and_services} /></Field>
       </Card>
 
       <Card
@@ -71,7 +72,7 @@ export function SearchQueries({ data }: Props) {
         head={["Search query", "Platforms", "Intent", "Why it matters", "Audience"]}
         rows={queries.map((q) => [
           <span className="query">“{q.query}”</span>,
-          <div className="chips">{q.platforms.map((p) => <span key={p} className={`chip platform ${p.toLowerCase()}`}>{p}</span>)}</div>,
+          <div className="platforms">{q.platforms.map((p) => <span key={p} className={`platform ${p.toLowerCase()}`}>{p}</span>)}</div>,
           <Badge>{q.intent}</Badge>,
           q.business_relevance,
           q.target_audience,
@@ -138,7 +139,7 @@ export function SEO({ data }: Props) {
         <div className="tiles">
           {s.supporting_content.map((item) => (
             <div key={item.title} className="tile">
-              <Badge>{item.type.replace(/_/g, " ")}</Badge>
+              <Badge>{item.type === "faq" ? "FAQ" : item.type.replace(/_/g, " ")}</Badge>
               <strong>{item.title}</strong>
               <p className="muted small">{item.purpose}</p>
             </div>
@@ -155,7 +156,7 @@ export function Services({ data }: Props) {
       {data.analysis.top_services.map((s, i) => (
         <article key={s.name} className="card service">
           <div className="service-head">
-            <span className="rank">{i + 1}</span>
+            <span className="rank">No. {String(i + 1).padStart(2, "0")}</span>
             <Badge tone={s.source === "website" ? "good" : "warn"}>{s.source === "website" ? "From website" : "Inferred"}</Badge>
           </div>
           <h3>{s.name}</h3>
@@ -219,7 +220,7 @@ export function RawJson({ data }: Props) {
       actions={
         <div className="row">
           <CopyButton text={json} label="Copy JSON" />
-          <button type="button" className="btn-ghost" onClick={download}><Icon name="download" size={16} />Download</button>
+          <button type="button" className="btn-ghost" onClick={download}><Icon name="download" size={14} />Download</button>
         </div>
       }
     >
