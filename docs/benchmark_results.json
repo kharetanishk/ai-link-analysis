@@ -1,0 +1,215 @@
+{
+  "run_at": "2026-11-18T18:39:52.871089+00:00",
+  "rows": [
+    {
+      "model": "gemini-3.1-flash-lite",
+      "site": "stripe.com",
+      "ok": false,
+      "error": "llm_unavailable"
+    },
+    {
+      "model": "gemini-3.1-flash-lite",
+      "site": "zerodha.com",
+      "ok": true,
+      "latency_s": 43.03,
+      "input_tokens": 6440,
+      "output_tokens": 2751,
+      "thinking_tokens": 1323,
+      "cost_usd": 0.00772,
+      "brand": "Zerodha",
+      "competitors": 3,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 5,
+      "competitor_names": [
+        "Upstox",
+        "Groww",
+        "Angel One"
+      ]
+    },
+    {
+      "model": "gemini-3.1-flash-lite",
+      "site": "hubspot.com",
+      "ok": true,
+      "latency_s": 16.48,
+      "input_tokens": 8620,
+      "output_tokens": 3041,
+      "thinking_tokens": 2554,
+      "cost_usd": 0.01055,
+      "brand": "HubSpot",
+      "competitors": 4,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 4,
+      "competitor_names": [
+        "Salesforce",
+        "Zoho CRM",
+        "Pipedrive",
+        "ActiveCampaign"
+      ]
+    },
+    {
+      "model": "gemini-3.1-flash-lite",
+      "site": "bluetokaicoffee.com",
+      "ok": true,
+      "latency_s": 14.42,
+      "input_tokens": 6834,
+      "output_tokens": 2785,
+      "thinking_tokens": 1410,
+      "cost_usd": 0.008,
+      "brand": "Blue Tokai Coffee Roasters",
+      "competitors": 3,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 5,
+      "competitor_names": [
+        "Sleepy Owl Coffee",
+        "Third Wave Coffee",
+        "Devans South Indian Coffee"
+      ]
+    },
+    {
+      "model": "gemini-3.1-flash-lite",
+      "site": "python.org",
+      "ok": true,
+      "latency_s": 14.97,
+      "input_tokens": 6718,
+      "output_tokens": 2905,
+      "thinking_tokens": 2904,
+      "cost_usd": 0.01039,
+      "brand": "Python Software Foundation",
+      "competitors": 3,
+      "services_from_site": 4,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 4,
+      "competitor_names": [
+        "Java (Oracle)",
+        "Node.js (OpenJS Foundation)",
+        "Ruby (Ruby-lang.org)"
+      ]
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "site": "stripe.com",
+      "ok": false,
+      "error": "llm_unavailable"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "site": "zerodha.com",
+      "ok": true,
+      "latency_s": 110.65,
+      "input_tokens": 6440,
+      "output_tokens": 2743,
+      "thinking_tokens": 0,
+      "cost_usd": 0.00879,
+      "brand": "Zerodha",
+      "competitors": 3,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 5,
+      "competitor_names": [
+        "Groww",
+        "Angel One",
+        "Upstox"
+      ]
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "site": "hubspot.com",
+      "ok": true,
+      "latency_s": 42.64,
+      "input_tokens": 8620,
+      "output_tokens": 2622,
+      "thinking_tokens": 0,
+      "cost_usd": 0.00914,
+      "brand": "HubSpot",
+      "competitors": 3,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 5,
+      "competitor_names": [
+        "Salesforce",
+        "ActiveCampaign",
+        "Pipedrive"
+      ]
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "site": "bluetokaicoffee.com",
+      "ok": true,
+      "latency_s": 9.78,
+      "input_tokens": 6834,
+      "output_tokens": 2558,
+      "thinking_tokens": 0,
+      "cost_usd": 0.00845,
+      "brand": "Blue Tokai Coffee Roasters",
+      "competitors": 3,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 4,
+      "competitor_names": [
+        "Sleepy Owl Coffee",
+        "Toffee Coffee Roasters",
+        "KC Roasters"
+      ]
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "site": "python.org",
+      "ok": true,
+      "latency_s": 46.67,
+      "input_tokens": 6718,
+      "output_tokens": 2622,
+      "thinking_tokens": 0,
+      "cost_usd": 0.00857,
+      "brand": "Python.org",
+      "competitors": 2,
+      "services_from_site": 5,
+      "title_len_ok": true,
+      "meta_len_ok": true,
+      "platforms_used": 3,
+      "competitor_names": [
+        "Oracle Java",
+        "Node.js"
+      ]
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "site": "stripe.com",
+      "ok": false,
+      "error": "llm_unavailable"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "site": "zerodha.com",
+      "ok": false,
+      "error": "llm_unavailable"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "site": "hubspot.com",
+      "ok": false,
+      "error": "llm_unavailable"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "site": "bluetokaicoffee.com",
+      "ok": false,
+      "error": "llm_unavailable"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "site": "python.org",
+      "ok": false,
+      "error": "llm_unavailable"
+    }
+  ]
+}
