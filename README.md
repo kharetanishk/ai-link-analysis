@@ -71,7 +71,8 @@ The analysis follows the assignment's integrity rules:
 
 Tips:
 - The address bar link is shareable. `…/?url=stripe.com#seo` opens straight to the SEO tab.
-- A site that was analyzed recently loads instantly from the 24-hour cache, with no AI cost.
+- Your last 8 reports are saved **in your own browser** (nothing is uploaded). They appear under **Recent on this device** on the home page and open instantly. Analyzing the same site again within 24 hours opens the saved copy at once; click **Re-analyze now** for a fresh run.
+- The server also caches each analysis for 24 hours, so a site someone else analyzed recently loads instantly, with no AI cost.
 - The moon and sun button switches between dark and light mode.
 
 A step-by-step guide with pictures is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.

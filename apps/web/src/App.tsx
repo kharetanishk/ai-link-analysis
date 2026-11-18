@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { analyzeStream, ApiError, type AnalysisResponse, type ProgressEvent } from "./api";
+import { clearHistory, findFresh, loadHistory, removeFromHistory, saveToHistory, timeAgo, type HistoryEntry } from "./history";
 import { AnalysisProgress } from "./progress";
 import { Audience, Competitors, RawJson, SearchQueries, SEO, Services } from "./sections";
 import { setTheme, type Theme } from "./theme";
@@ -49,7 +50,7 @@ type State =
   | { kind: "idle" }
   | { kind: "loading"; url: string; events: ProgressEvent[] }
   | { kind: "error"; url: string; error: ApiError }
-  | { kind: "done"; data: AnalysisResponse };
+  | { kind: "done"; data: AnalysisResponse; savedAt?: number; input: string };
 
 export default function App() {
   const [url, setUrl] = useState(() => new URLSearchParams(location.search).get("url") ?? "");
@@ -57,6 +58,7 @@ export default function App() {
   const [tab, setTabState] = useState<TabId>(() => tabFromHash());
   const [theme, setThemeState] = useState<Theme>(() => (document.documentElement.dataset.theme as Theme) ?? "light");
   const controller = useRef<AbortController | null>(null);
+  const [recent, setRecent] = useState<HistoryEntry[]>(() => loadHistory());
   const input = useRef<HTMLInputElement>(null);
 
   const setTab = (t: TabId) => {
@@ -69,9 +71,19 @@ export default function App() {
     setThemeState(next);
   };
 
-  const run = async (target: string) => {
+  const open = (entry: HistoryEntry) => {
+    controller.current?.abort();
+    setUrl(entry.input);
+    history.replaceState(null, "", `?url=${encodeURIComponent(entry.input)}${location.hash}`);
+    setState({ kind: "done", data: entry.data, savedAt: entry.savedAt, input: entry.input });
+  };
+
+  const run = async (target: string, fresh = false) => {
     const value = target.trim();
     if (!value) return input.current?.focus();
+    // 24h ke andar ka report is device par hai to turant dikhao, network call nahi
+    const saved = fresh ? undefined : findFresh(value);
+    if (saved) return open(saved);
     controller.current?.abort();
     const ctrl = new AbortController();
     controller.current = ctrl;
@@ -82,7 +94,8 @@ export default function App() {
       const data = await analyzeStream(value, ctrl.signal, (event) =>
         setState((s) => (s.kind === "loading" && !ctrl.signal.aborted ? { ...s, events: [...s.events, event] } : s)),
       );
-      setState({ kind: "done", data });
+      setRecent(saveToHistory(value, data));
+      setState({ kind: "done", data, input: value });
     } catch (err) {
       if (ctrl.signal.aborted) return;
       setState({ kind: "error", url: value, error: err instanceof ApiError ? err : new ApiError("unknown", "Something went wrong.") });
@@ -177,6 +190,30 @@ export default function App() {
       </header>
 
       <main className="content">
+        {idle && recent.length > 0 && (
+          <section className="recent" aria-label="Recent analyses">
+            <div className="recent-head">
+              <h2>Recent on this device</h2>
+              <button type="button" className="text-btn" onClick={() => setRecent(clearHistory())}>Clear</button>
+            </div>
+            <ul className="recent-list">
+              {recent.map((e) => (
+                <li key={e.savedAt}>
+                  <button type="button" className="recent-card" onClick={() => open(e)}>
+                    <span className="recent-mono" aria-hidden="true">{e.data.brand.name.slice(0, 1).toUpperCase()}</span>
+                    <span className="recent-text">
+                      <strong>{e.data.brand.name}</strong>
+                      <span>{new URL(e.data.website).hostname.replace(/^www\./, "")} · {timeAgo(e.savedAt)}</span>
+                    </span>
+                  </button>
+                  <button type="button" className="recent-remove" aria-label={`Remove ${e.data.brand.name}`} onClick={() => setRecent(removeFromHistory(e.savedAt))}>
+                    <Icon name="close" size={13} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {idle && (
           <ul className="features">
             {FEATURES.map((f) => (
@@ -195,7 +232,9 @@ export default function App() {
           </div>
         )}
         {state.kind === "error" && <ErrorCard state={state} onRetry={() => run(state.url)} />}
-        {state.kind === "done" && <Results data={state.data} tab={tab} setTab={setTab} />}
+        {state.kind === "done" && (
+          <Results data={state.data} tab={tab} setTab={setTab} savedAt={state.savedAt} onRefresh={() => run(state.input, true)} />
+        )}
       </main>
 
       <footer className="footer">Insights are AI-generated from a website's public content. Verify before acting.</footer>
@@ -231,7 +270,13 @@ function ErrorCard({ state, onRetry }: { state: Extract<State, { kind: "error" }
   );
 }
 
-function Results({ data, tab, setTab }: { data: AnalysisResponse; tab: TabId; setTab: (t: TabId) => void }) {
+function Results({ data, tab, setTab, savedAt, onRefresh }: {
+  data: AnalysisResponse;
+  tab: TabId;
+  setTab: (t: TabId) => void;
+  savedAt?: number;
+  onRefresh: () => void;
+}) {
   const active = TABS.find((t) => t.id === tab) ?? TABS[0];
   const host = new URL(data.website).hostname.replace(/^www\./, "");
   const { meta } = data;
@@ -258,9 +303,16 @@ function Results({ data, tab, setTab }: { data: AnalysisResponse; tab: TabId; se
         <dl className="stats">
           <div><dt>Time</dt><dd>{(meta.latency_ms / 1000).toFixed(1)}s</dd></div>
           <div><dt>Pages read</dt><dd>{meta.pages_analyzed.length}</dd></div>
-          <div><dt>AI cost</dt><dd>{meta.cached ? "Cached" : `$${meta.estimated_cost_usd.toFixed(3)}`}</dd></div>
+          <div><dt>AI cost</dt><dd>{savedAt ? "Saved" : meta.cached ? "Cached" : `$${meta.estimated_cost_usd.toFixed(3)}`}</dd></div>
         </dl>
       </section>
+
+      {savedAt && (
+        <div className="saved-note" role="status">
+          <span>Opened from this device · analyzed {timeAgo(savedAt)}</span>
+          <button type="button" className="text-btn" onClick={onRefresh}>Re-analyze now</button>
+        </div>
+      )}
 
       {meta.warnings.length > 0 && (
         <div className="notice" role="status">

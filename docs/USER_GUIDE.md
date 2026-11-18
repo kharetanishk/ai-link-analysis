@@ -81,7 +81,15 @@ Below that are six tabs. Click any tab, or use the ← → arrow keys.
 - **Share**: the address bar link opens the same report. Adding `#seo`, `#services` and so on opens a specific tab. Example: `https://link-analysis.lunarnodes.co.in/?url=stripe.com#seo`
 - **Save**: go to the **JSON** tab and click **Download**.
 
-### 6. Light and dark mode
+### 6. Your recent reports
+
+Your last 8 reports are kept **on your own device** (in this browser only; nothing is uploaded). They appear on the home page under **Recent on this device**:
+
+- Click a card to reopen that report instantly. No waiting, no internet needed.
+- Analyzing a site you already checked in the last 24 hours opens your saved copy straight away. Click **Re-analyze now** for fresh results.
+- Hover a card and click **×** to remove it, or click **Clear** to remove them all.
+
+### 7. Light and dark mode
 
 Use the **Light / Dark** switch in the top-right corner. Your choice is remembered.
 
