@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { analyze, ApiError, type AnalysisResponse } from "./api";
 import { Audience, Competitors, RawJson, SearchQueries, SEO, Services } from "./sections";
+import { setTheme, type Theme } from "./theme";
 import { Badge, Icon } from "./ui";
 
 const TABS = [
@@ -27,6 +28,13 @@ const TIPS: Record<string, string> = {
   llm_unavailable: "The AI is busy. Waiting a minute usually fixes this.",
 };
 
+type TabId = (typeof TABS)[number]["id"];
+
+function tabFromHash(): TabId {
+  const id = location.hash.slice(1);
+  return TABS.find((t) => t.id === id)?.id ?? "competitors";
+}
+
 type State =
   | { kind: "idle" }
   | { kind: "loading"; url: string }
@@ -36,7 +44,17 @@ type State =
 export default function App() {
   const [url, setUrl] = useState(() => new URLSearchParams(location.search).get("url") ?? "");
   const [state, setState] = useState<State>({ kind: "idle" });
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("competitors");
+  const [tab, setTabState] = useState<TabId>(() => tabFromHash());
+  const [theme, setThemeState] = useState<Theme>(() => (document.documentElement.dataset.theme as Theme) ?? "light");
+  const setTab = (t: TabId) => {
+    setTabState(t);
+    history.replaceState(null, "", `${location.search}#${t}`);
+  };
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    setThemeState(next);
+  };
   const controller = useRef<AbortController | null>(null);
 
   const run = async (target: string) => {
@@ -47,10 +65,9 @@ export default function App() {
     controller.current = ctrl;
     setUrl(value);
     setState({ kind: "loading", url: value });
-    history.replaceState(null, "", `?url=${encodeURIComponent(value)}`);
+    history.replaceState(null, "", `?url=${encodeURIComponent(value)}${location.hash}`);
     try {
       const data = await analyze(value, ctrl.signal);
-      setTab("competitors");
       setState({ kind: "done", data });
     } catch (err) {
       if (ctrl.signal.aborted) return;
@@ -78,7 +95,12 @@ export default function App() {
           <span className="logo-mark"><Icon name="sparkle" size={18} /></span>
           linklens
         </a>
-        <a className="btn-ghost" href="/docs" target="_blank" rel="noopener">API docs <Icon name="external" size={14} /></a>
+        <div className="topbar-actions">
+          <button type="button" className="btn-ghost icon-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
+          </button>
+          <a className="btn-ghost" href="/docs" target="_blank" rel="noopener">API docs <Icon name="external" size={14} /></a>
+        </div>
       </nav>
 
       <header className={`hero ${compact ? "compact" : ""}`}>
@@ -167,7 +189,7 @@ function ErrorCard({ state, onRetry }: { state: Extract<State, { kind: "error" }
   );
 }
 
-function Results({ data, tab, setTab }: { data: AnalysisResponse; tab: string; setTab: (t: (typeof TABS)[number]["id"]) => void }) {
+function Results({ data, tab, setTab }: { data: AnalysisResponse; tab: TabId; setTab: (t: TabId) => void }) {
   const active = TABS.find((t) => t.id === tab) ?? TABS[0];
   const host = new URL(data.website).hostname.replace(/^www\./, "");
   const { meta } = data;

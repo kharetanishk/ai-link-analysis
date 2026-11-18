@@ -22,8 +22,8 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+@media all {
+  :root[data-theme="dark"] {
     --text: #f2f2f2;
     --muted: #a3a3a3;
     --border: #3a3a3a;
@@ -77,6 +77,8 @@ a { color: inherit; }
   backdrop-filter: saturate(180%) blur(12px);
 }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: var(--accent); text-decoration: none; letter-spacing: -0.03em; }
+.topbar-actions { display: flex; align-items: center; gap: 4px; }
+.icon-btn { padding: 8px; }
 .logo-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--accent-grad); color: #fff; }
 
 .hero { text-align: center; padding: clamp(48px, 10vh, 112px) 16px 32px; display: grid; gap: 16px; justify-items: center; transition: padding 0.4s var(--ease); }
@@ -139,14 +141,14 @@ a { color: inherit; }
 .platform.instagram { background: linear-gradient(45deg, #f58529, #dd2a7b, #8134af); }
 .platform.linkedin { background: #0a66c2; }
 .platform.x { background: #111; }
-@media (prefers-color-scheme: dark) { .platform.x { background: #444; } }
+:root[data-theme="dark"] .platform.x { background: #444; }
 
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; background: var(--soft); white-space: nowrap; }
 .badge.good { background: var(--good-bg); color: var(--good); }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
 .badge.bad { background: var(--bad-bg); color: var(--bad); }
 .badge.accent { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent-strong); }
-@media (prefers-color-scheme: dark) { .badge.accent, .chip.accent { color: #ff8fa3; } }
+:root[data-theme="dark"] .badge.accent, :root[data-theme="dark"] .chip.accent { color: #ff8fa3; }
 
 .list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .list li::marker { color: var(--accent); }
