@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 86_400
     cache_max_entries: int = 256
 
+    max_analyses_per_day: int = 300
     rate_limit_requests: int = 10
     rate_limit_window_seconds: int = 60
 

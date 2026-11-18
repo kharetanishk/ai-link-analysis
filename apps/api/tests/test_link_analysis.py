@@ -107,6 +107,18 @@ def test_rate_limit(fake_dns):
     assert last.headers["retry-after"]
 
 
+@respx.mock
+def test_daily_capacity(client):
+    mock_site()
+    client.app.state.analysis.settings = client.app.state.analysis.settings.model_copy(
+        update={"max_analyses_per_day": 1}
+    )
+    assert client.post("/link-analysis", json={"url": "acme.test"}).status_code == 200
+    assert client.post("/link-analysis", json={"url": "acme.test"}).status_code == 200
+    blocked = client.post("/link-analysis", json={"url": "www.acme.test"})
+    assert blocked.status_code == 503 and blocked.json()["error"]["code"] == "llm_unavailable"
+
+
 def test_health_and_docs(client):
     assert client.get("/health").json()["status"] == "ok"
     assert client.get("/docs").status_code == 200

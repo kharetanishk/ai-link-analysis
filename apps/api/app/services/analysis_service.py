@@ -1,9 +1,9 @@
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from app.config import Settings
-from app.errors import LLMConfigError
+from app.errors import LLMConfigError, LLMUnavailableError
 from app.schemas import (
     Analysis,
     LinkAnalysisResponse,
@@ -39,6 +39,8 @@ class AnalysisService:
         self.llm = llm
         self.cache = cache
         self.settings = settings
+        self._day: date | None = None
+        self._runs_today = 0
 
     async def analyze(self, raw_url: str) -> LinkAnalysisResponse:
         started = time.perf_counter()
@@ -59,8 +61,17 @@ class AnalysisService:
             update={"meta": result.meta.model_copy(update={"latency_ms": int((time.perf_counter() - started) * 1000)})}
         )
 
+    def _consume_daily_budget(self) -> None:
+        today = datetime.now(UTC).date()
+        if today != self._day:
+            self._day, self._runs_today = today, 0
+        if self._runs_today >= self.settings.max_analyses_per_day:
+            raise LLMUnavailableError("Daily analysis capacity has been reached. Please try again tomorrow.")
+        self._runs_today += 1
+
     async def _run(self, url: str) -> LinkAnalysisResponse:
         site = await self.extractor.extract(url)
+        self._consume_daily_budget()
         llm = await self.llm.analyze(SYSTEM_PROMPT, build_prompt(site, self.settings.content_char_budget))
         data = llm.data
 
